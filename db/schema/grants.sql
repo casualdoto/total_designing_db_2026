@@ -1,9 +1,8 @@
 DO $$
 BEGIN
+    -- Существующая роль может использоваться другими базами: её пароль сохраняем.
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'inspector') THEN
         EXECUTE 'CREATE ROLE inspector LOGIN PASSWORD ''NetoSQL2025''';
-    ELSE
-        EXECUTE 'ALTER ROLE inspector LOGIN PASSWORD ''NetoSQL2025''';
     END IF;
 END;
 $$;
