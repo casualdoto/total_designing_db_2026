@@ -17,9 +17,10 @@
 Порядок установки на тестовой БД с готовым `exts.uuid_generate_v4()`:
 
 ```sh
-psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/04_insert_test_data.sql -f db/schema/05_erase_test_data.sql -f db/schema/grants.sql
+psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/04_insert_test_data.sql -f db/schema/05_erase_test_data.sql -f db/schema/06_add_product.sql -f db/schema/grants.sql
 psql -v ON_ERROR_STOP=1 -f db/check_business_constraints.sql
 psql -v ON_ERROR_STOP=1 -f db/check_test_data.sql
+psql -v ON_ERROR_STOP=1 -f db/check_add_product.sql
 ```
 
 Проверки FOOD-102/103: `db/check_test_data.sql`. Скрипт работает в транзакции
@@ -29,8 +30,25 @@ psql -v ON_ERROR_STOP=1 -f db/check_test_data.sql
 перед следующим CALL нужно вернуть `SET CONSTRAINTS ALL DEFERRED`.
 
 Вычисляемые атрибуты проверяются через `order_totals` и `payment_details`,
-автор отзыва — через `review_details`. FOOD-104–110 и восстановление бэкапа
+автор отзыва — через `review_details`. FOOD-105–110 и восстановление бэкапа
 этим прогоном не проверяются.
+
+### Результаты FOOD-104 — 2026-11-14
+
+| Проверка | Факт | Вердикт |
+|---|---|---|
+| Все атрибуты и ID | Добавляется ровно одна строка, значения сохраняются, DEFAULT создаёт UUID v4 | OK |
+| Необязательные поля | Фото можно не передавать или явно передать NULL; рейтинг допускает NULL | OK |
+| Начальный рейтинг | Переданное 4.5 сохраняется без отзывов по согласованному уточнению FOOD-104 | OK |
+| Границы | Названия 1/100 кириллических символов, цена 0 и 99999.99, рейтинги 0/5, все enum; округление numeric | OK |
+| Родительские записи | Несуществующие ресторан/категория: 23503, понятное сообщение и ID | OK |
+| Обязательные поля и длины | Шесть обязательных NULL: 23502; пустые имя/описание: 23514; имя 101 символ: 22001 | OK |
+| Числовые ошибки | Отрицательная цена, рейтинг вне диапазона, NaN/Infinity/-Infinity: 23514; переполнение, включая округление: 22003 | OK |
+| Атомарность и права | После каждой ошибки набор блюд прежний; SECURITY INVOKER и search_path проверены | OK |
+
+Генератор FOOD-102 по-прежнему добавляет блюда напрямую и не вызывает `add_product`.
+Регрессия FOOD-101–103 повторно выполнена 2026-11-14: оба существующих скрипта
+прошли, включая генерацию с 1000, повторные вызовы, выплаты и очистку.
 
 ### Результаты FOOD-102/103 — 2026-11-13
 
@@ -507,36 +525,60 @@ LIMIT 20;
 ### E.1. `add_product` — успешный вызов
 
 ```sql
-SELECT count(*) AS before FROM product;
-
-CALL add_product(
-    p_restaurant_id => (SELECT restaurant_id FROM restaurant LIMIT 1),
-    p_product_category_id => (SELECT product_category_id FROM product_category LIMIT 1),
-    p_name => 'Тестовое блюдо',
-    p_price => 250,
-    p_rating => 4.5,
-    p_status => 'доступно',
-    p_description => 'Описание'
-    -- + photo_url если есть
-);
-
-SELECT count(*) AS after FROM product;
+-- После insert_test_data(1) или на другой непустой тестовой схеме.
+BEGIN;
+SET LOCAL ROLE inspector;
+SET LOCAL search_path = khrestianovskii_food, exts, pg_catalog;
+DO $$
+DECLARE r uuid; c uuid; n bigint;
+BEGIN
+    SELECT restaurant_id INTO STRICT r FROM restaurant LIMIT 1;
+    SELECT product_category_id INTO STRICT c FROM product_category LIMIT 1;
+    SELECT count(*) INTO n FROM product;
+    CALL add_product(p_restaurant_id => r, p_product_category_id => c,
+        p_name => 'Тестовое блюдо', p_price => 250, p_rating => 4.5,
+        p_status => 'доступно', p_description => 'Описание');
+    IF (SELECT count(*) FROM product) <> n + 1 THEN
+        RAISE EXCEPTION 'Ожидалась одна новая строка';
+    END IF;
+    RAISE NOTICE 'OK: добавлено одно блюдо';
+END;
+$$;
+ROLLBACK;
 ```
 
 Ожидается: `after = before + 1`.
-Факт: ___
+Факт: проверено 2026-11-14 скриптом db/check_add_product.sql; атрибуты и UUID проверены отдельно.
+Вердикт: OK
 
 ### E.2. `add_product` — падает на несуществующий ресторан
 
 ```sql
-CALL add_product(
-    p_restaurant_id => '00000000-0000-0000-0000-000000000000',
-    -- остальные аргументы
-);
+BEGIN;
+SET LOCAL ROLE inspector;
+SET LOCAL search_path = khrestianovskii_food, exts, pg_catalog;
+DO $$
+DECLARE c uuid; missing_id uuid := exts.uuid_generate_v4();
+BEGIN
+    SELECT product_category_id INTO STRICT c FROM product_category LIMIT 1;
+    IF EXISTS (SELECT FROM restaurant WHERE restaurant_id = missing_id) THEN
+        RAISE EXCEPTION 'Тестовый ID должен отсутствовать';
+    END IF;
+    BEGIN
+        CALL add_product(missing_id,c,'Блюдо',250,NULL,'доступно','Описание');
+    EXCEPTION WHEN foreign_key_violation THEN
+        RAISE NOTICE 'OK: % [%]',SQLERRM,SQLSTATE;
+        RETURN;
+    END;
+    RAISE EXCEPTION 'Ожидалась ошибка 23503';
+END;
+$$;
+ROLLBACK;
 ```
 
 Ожидается: ошибка с внятным сообщением.
-Факт: ___
+Факт: проверено 2026-11-14 скриптом db/check_add_product.sql; аналогично проверена отсутствующая категория.
+Вердикт: OK
 
 ### E.3. `rating_change` — пересчитывает рейтинг
 
