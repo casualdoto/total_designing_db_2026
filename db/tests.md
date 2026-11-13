@@ -8,6 +8,20 @@
 
 ## Окружение
 
+Автоматические проверки ограничений FOOD-101: `db/check_business_constraints.sql`.
+Проверены 2026-11-13 на PostgreSQL 15 в отдельном контейнере под ролью
+`inspector`: корректный заказ, отклонение нарушений при изменениях состава,
+цены, ресторана, оплаты и отзывов, граничная сумма 1000 ₽, замена оплаты
+и удаление заказа. Все проверки прошли; тестовые данные откатываются.
+
+Порядок установки на тестовой БД с готовым `exts.uuid_generate_v4()`:
+
+```sh
+psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/grants.sql -f db/check_business_constraints.sql
+```
+
+Остальные разделы протокола ниже автоматически не проверялись.
+
 | Параметр | Значение |
 |---|---|
 | PostgreSQL version | `SELECT version();` → 15+ |
