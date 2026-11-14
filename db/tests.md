@@ -17,11 +17,12 @@
 Порядок установки на тестовой БД с готовым `exts.uuid_generate_v4()`:
 
 ```sh
-psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/04_insert_test_data.sql -f db/schema/05_erase_test_data.sql -f db/schema/06_add_product.sql -f db/schema/07_rating_change.sql -f db/schema/grants.sql
+psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/04_insert_test_data.sql -f db/schema/05_erase_test_data.sql -f db/schema/06_add_product.sql -f db/schema/07_rating_change.sql -f db/schema/08_get_statistic.sql -f db/schema/grants.sql
 psql -v ON_ERROR_STOP=1 -f db/check_business_constraints.sql
 psql -v ON_ERROR_STOP=1 -f db/check_test_data.sql
 psql -v ON_ERROR_STOP=1 -f db/check_add_product.sql
 psql -v ON_ERROR_STOP=1 -f db/check_rating_change.sql
+psql -v ON_ERROR_STOP=1 -f db/check_get_statistic.sql
 ```
 
 Проверки FOOD-102/103: `db/check_test_data.sql`. Скрипт работает в транзакции
@@ -33,6 +34,21 @@ psql -v ON_ERROR_STOP=1 -f db/check_rating_change.sql
 Вычисляемые атрибуты проверяются через `order_totals` и `payment_details`,
 автор отзыва — через `review_details`. FOOD-105–110 и восстановление бэкапа
 этим прогоном не проверяются.
+
+### Результаты FOOD-106 — 2026-11-14
+
+| Проверка | Факт | Вердикт |
+|---|---|---|
+| Контракт | Пять колонок с заданными именами/порядком и типами text/text/numeric/numeric/text; VOLATILE, SECURITY INVOKER, search_path | OK |
+| Пустые данные | Пустая схема — ноль строк; ресторан без доставок — 0/0 и NULL для лидеров | OK |
+| Статусы и история | Исключены все четыре недоставленных статуса; включены неактивный ресторан и доставка старше 180 дней | OK |
+| Деньги и точность | Заданные итоги 1540, 2200, 4400.01 дают сумму 8140.01 и среднее 8140.01/3 без дополнительного округления | OK |
+| Лидеры | Дробные количества, разные UUID с одинаковым названием блюда, клиент с большим числом заказов против клиента с большими тратами/числом позиций | OK |
+| Ничьи и названия | В 40 вызовах победители только из множества лидеров; одинаковые названия ресторанов не объединяют строки | OK |
+| Исторические цены | Изменение всех текущих цен блюд на 0 не меняет суммы и лидеров по истории заказов | OK |
+| Генерация 1000 | Ровно 1000 строк; суммы/средние сверены с order_totals, лидеры — с отдельными контрольными запросами | OK |
+| План выполнения тела | EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON): по одному узлу чтения order и order_structure, Actual Loops=1; нет payment/review, окон и коррелированных SubPlan | OK |
+| Регрессия FOOD-101–105 | Все четыре существующих скрипта прошли: целостность, add_product, рейтинги, повторная генерация 1000, выплаты и очистка | OK |
 
 ### Результаты FOOD-105 — 2026-11-14
 
