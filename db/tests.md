@@ -17,23 +17,30 @@
 Порядок установки на тестовой БД с готовым `exts.uuid_generate_v4()`:
 
 ```sh
-psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/04_insert_test_data.sql -f db/schema/05_erase_test_data.sql -f db/schema/06_add_product.sql -f db/schema/07_rating_change.sql -f db/schema/08_get_statistic.sql -f db/schema/grants.sql
+psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/04_insert_test_data.sql -f db/schema/05_erase_test_data.sql -f db/schema/06_add_product.sql -f db/schema/07_rating_change.sql -f db/schema/08_get_statistic.sql -f db/schema/09_courier_salary.sql -f db/schema/grants.sql
 psql -v ON_ERROR_STOP=1 -f db/check_business_constraints.sql
 psql -v ON_ERROR_STOP=1 -f db/check_test_data.sql
 psql -v ON_ERROR_STOP=1 -f db/check_add_product.sql
 psql -v ON_ERROR_STOP=1 -f db/check_rating_change.sql
 psql -v ON_ERROR_STOP=1 -f db/check_get_statistic.sql
+psql -v ON_ERROR_STOP=1 -f db/check_courier_salary.sql
 ```
 
-Проверки FOOD-102/103: `db/check_test_data.sql`. Скрипт работает в транзакции
-под `inspector`, принудительно выполняет отложенные ограничения и в конце
-делает ROLLBACK, сохраняя исходные данные. Генерация и очистка требуют обычного
-для схемы режима DEFERRED; после ручного `SET CONSTRAINTS ALL IMMEDIATE`
-перед следующим CALL нужно вернуть `SET CONSTRAINTS ALL DEFERRED`.
+### Результаты FOOD-107 — 2026-11-14
 
-Вычисляемые атрибуты проверяются через `order_totals` и `payment_details`,
-автор отзыва — через `review_details`. FOOD-105–110 и восстановление бэкапа
-этим прогоном не проверяются.
+| Проверка | Факт | Вердикт |
+|---|---|---|
+| Пустая схема и генератор | На пустой схеме нет выплат; после insert_test_data(10) выплаты совпадают с историей генератора | OK |
+| Пороги доставок | 0, 150, 151, 250, 251, 500, 501; коэффициенты 0.1/0.2/0.3/0.5 по правилам | OK |
+| Денежный расчёт | Разные исходные ставки, дробные количества, несколько позиций, комиссия каждого заказа до суммирования; 120.006 округляется до 120.01 | OK |
+| Статусы и месяц | Исключены четыре недоставленных статуса, предыдущий месяц и начало следующего; начало текущего включено; месяц определяется по созданию, не доставке | OK |
+| Увольнение | С доставками и без них: сумма рассчитывается, коэффициент уволенного не меняется | OK |
+| Повторный вызов | Два повторения сохраняют выплаты и коэффициенты; новая доставка переводит порог 150→151, ставка расчёта остаётся 0.4 | OK |
+| История | Цена карточки блюда не влияет на выплату; выплаты пяти других месяцев не меняются | OK |
+| Переполнение | Выплата 1020000 отклонена с 22003; все выплаты и коэффициенты совпадают со снимком до CALL | OK |
+| Права | SECURITY INVOKER, фиксированный search_path; вызовы выполнены под inspector | OK |
+| Два соединения | B ожидало Lock от A; одна выплата за месяц, coefficient_used=0.5, следующий коэффициент=0.1, сумма 787.95 совпала с контрольной | OK |
+| Регрессия FOOD-101–106 | Все пять прежних SQL-сценариев прошли, включая генерацию с 1000, статистику и EXPLAIN, рейтинги, add_product и очистку | OK |
 
 ### Результаты FOOD-106 — 2026-11-14
 
