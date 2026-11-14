@@ -17,10 +17,11 @@
 Порядок установки на тестовой БД с готовым `exts.uuid_generate_v4()`:
 
 ```sh
-psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/04_insert_test_data.sql -f db/schema/05_erase_test_data.sql -f db/schema/06_add_product.sql -f db/schema/grants.sql
+psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/04_insert_test_data.sql -f db/schema/05_erase_test_data.sql -f db/schema/06_add_product.sql -f db/schema/07_rating_change.sql -f db/schema/grants.sql
 psql -v ON_ERROR_STOP=1 -f db/check_business_constraints.sql
 psql -v ON_ERROR_STOP=1 -f db/check_test_data.sql
 psql -v ON_ERROR_STOP=1 -f db/check_add_product.sql
+psql -v ON_ERROR_STOP=1 -f db/check_rating_change.sql
 ```
 
 Проверки FOOD-102/103: `db/check_test_data.sql`. Скрипт работает в транзакции
@@ -32,6 +33,25 @@ psql -v ON_ERROR_STOP=1 -f db/check_add_product.sql
 Вычисляемые атрибуты проверяются через `order_totals` и `payment_details`,
 автор отзыва — через `review_details`. FOOD-105–110 и восстановление бэкапа
 этим прогоном не проверяются.
+
+### Результаты FOOD-105 — 2026-11-14
+
+Проверено на PostgreSQL 15.19 под `inspector`. `db/check_rating_change.sql`
+создаёт только свои фикстуры и завершает изменения ROLLBACK. Существующие
+примеры E.3/E.4 сохранены без изменений; исполняемые проверки используют
+текущую нормализованную схему и валидные объекты заказов.
+
+| Проверка | Факт | Вердикт |
+|---|---|---|
+| INSERT/DELETE для блюда и ресторана | Оценки 3/4/5 дают 4; удаление 3 даёт 4.5; удаление всех даёт NULL | OK |
+| UPDATE | Оценка, текст и фото вызывают пересчёт; одинаковая пара OLD/NEW обрабатывается один раз | OK |
+| Переносы | Между блюдами, ресторанами, через смену типа и отзыв на заказ; проверены оба агрегата | OK |
+| Точность и пакетные изменения | Среднее 4/4/5 округляется до 4.33; многострочные INSERT/UPDATE/DELETE работают | OK |
+| Начальный рейтинг FOOD-104 | 4.5 заменяется первой оценкой; после последнего удаления NULL; нетронутое блюдо сохраняет 4.5 | OK |
+| Целостность и откат | Невалидный перенос отклонён FOOD-101; агрегаты и отзыв откатываются вместе | OK |
+| Контракт и рекурсия | RETURNS trigger, SECURITY INVOKER, фиксированный search_path; обновления родителей не вызывают рекурсию | OK |
+| Два соединения READ COMMITTED | Второе INSERT ожидало Lock (один блокирующий PID); после коммитов обеих оценок 3 и 5 рейтинг = AVG = 4.00, два отзыва | OK |
+| Регрессия FOOD-101–104 | Все три прежних проверочных скрипта прошли, включая генерацию 1000, повторные вызовы, выплаты, add_product и очистку | OK |
 
 ### Результаты FOOD-104 — 2026-11-14
 
