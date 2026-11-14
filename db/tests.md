@@ -17,14 +17,30 @@
 Порядок установки на тестовой БД с готовым `exts.uuid_generate_v4()`:
 
 ```sh
-psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/04_insert_test_data.sql -f db/schema/05_erase_test_data.sql -f db/schema/06_add_product.sql -f db/schema/07_rating_change.sql -f db/schema/08_get_statistic.sql -f db/schema/09_courier_salary.sql -f db/schema/grants.sql
+psql -v ON_ERROR_STOP=1 -f db/schema/01_types.sql -f db/schema/02_tables.sql -f db/schema/03_business_constraints.sql -f db/schema/04_insert_test_data.sql -f db/schema/05_erase_test_data.sql -f db/schema/06_add_product.sql -f db/schema/07_rating_change.sql -f db/schema/08_get_statistic.sql -f db/schema/09_courier_salary.sql -f db/schema/10_how_much_money.sql -f db/schema/grants.sql
 psql -v ON_ERROR_STOP=1 -f db/check_business_constraints.sql
 psql -v ON_ERROR_STOP=1 -f db/check_test_data.sql
 psql -v ON_ERROR_STOP=1 -f db/check_add_product.sql
 psql -v ON_ERROR_STOP=1 -f db/check_rating_change.sql
 psql -v ON_ERROR_STOP=1 -f db/check_get_statistic.sql
 psql -v ON_ERROR_STOP=1 -f db/check_courier_salary.sql
+psql -v ON_ERROR_STOP=1 -f db/check_how_much_money.sql
 ```
+
+### Результаты FOOD-108 — 2026-11-14
+
+| Проверка | Факт | Вердикт |
+|---|---|---|
+| Контракт | Восемь колонок в заданном порядке: text и семь numeric; YYYY-MM; обычное представление security_invoker | OK |
+| Пустой результат | Пустая схема, только выплаты и только недоставленные заказы не создают календарь | OK |
+| Один месяц | Декабрь 2023: суммы 1000/1100, комиссия 100, выплаты двух курьеров 40, прибыль 60; предыдущая комиссия и разность NULL | OK |
+| Непрерывный календарь | Декабрь–март включает январь и февраль без доставок; LAG учитывает нули, а не перескакивает через разрыв | OK |
+| Выплаты без доставок | В феврале выплаты 20+30 дают courier_pay=50 и net_profit=-50; в январе без выплат прибыль 0 | OK |
+| Округления и позиции | Два заказа по 2000.06 дают 4000.12 без комиссии и 4400.14 с комиссией; выплаты не размножают суммы | OK |
+| История и границы | Текущие цены не влияют; месяц определяется по созданию, не доставке; выплаты ноября/апреля не расширяют календарь | OK |
+| Изменения без REFRESH | Доставка 29 февраля 2024 меняет февраль и сравнение марта; отмена мартовских доставок сокращает диапазон | OK |
+| Генерация 1000 | Все восемь колонок сверены с независимым эталоном: order_totals, generate_series календаря и JOIN предыдущего месяца | OK |
+| Регрессия FOOD-101–107 | Все шесть прежних SQL-сценариев прошли в отдельных чистых базах, включая статистику, зарплату, рейтинги, генерацию 1000 и очистку | OK |
 
 ### Результаты FOOD-107 — 2026-11-14
 

@@ -164,8 +164,8 @@
 
 **AC:**
 
-- [] Представление `how_much_money`.
-- [] Колонки строго с этими именами:
+- [x] Представление `how_much_money`.
+- [x] Колонки строго с этими именами:
   - `year_month` (тип `text`, формат `YYYY-MM`)
   - `sum_no_commission` (`numeric`)
   - `sum_with_commission` (`numeric`)
@@ -174,19 +174,20 @@
   - `commission_diff` (`numeric`)
   - `courier_pay` (`numeric`)
   - `net_profit` (`numeric`)
-- [] `year_month` — все месяцы от первого месяца с доставленными заказами до последнего.
-- [] `sum_no_commission` — сумма `order_amount` доставленных заказов за месяц.
-- [] `sum_with_commission` — сумма `total_amount` доставленных заказов за месяц.
-- [] `commission` = `sum_with_commission - sum_no_commission`.
-- [] `prev_commission` — значение `commission` за предыдущий месяц. `NULL` для первого месяца.
-- [] `commission_diff` = `commission - prev_commission`.
-- [] `courier_pay` — сумма `courier_pay.amount` за месяц.
-- [] `net_profit` = `commission - courier_pay`.
-- [] Месяцы без заказов присутствуют в результате (BR-11.9) с нулевыми суммами.
-- [] Рекурсивный CTE для генерации серии месяцев.
+- [x] `year_month` — все месяцы от первого месяца с доставленными заказами до последнего.
+- [x] `sum_no_commission` — сумма `order_amount` доставленных заказов за месяц.
+- [x] `sum_with_commission` — сумма `total_amount` доставленных заказов за месяц.
+- [x] `commission` = `sum_with_commission - sum_no_commission`.
+- [x] `prev_commission` — значение `commission` за предыдущий месяц. `NULL` для первого месяца.
+- [x] `commission_diff` = `commission - prev_commission`.
+- [x] `courier_pay` — сумма `courier_pay.amount` за месяц.
+- [x] `net_profit` = `commission - courier_pay`.
+- [x] Месяцы без заказов присутствуют в результате (BR-11.9) с нулевыми суммами.
+- [x] Рекурсивный CTE для генерации серии месяцев.
 
 **Проверка:** на сгенерированных данных отчёт покрывает все месяцы от первого до последнего доставленного заказа; `net_profit` для месяцев без заказов равен 0.
 
+Реализовано в `db/schema/10_how_much_money.sql`.
 ---
 
 ## FOOD-109. Пользователь inspector
