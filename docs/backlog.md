@@ -27,7 +27,7 @@
 
 **Проверка:** восстановление бэкапа → схема создаётся без ошибок; `information_schema` показывает все таблицы и FK.
 
-Связь отзыва с клиентом реализована через `review.order_id → order.client_id`; автор доступен в `review_details`, отдельный `review.client_id` исключён при нормализации. Межтабличные проверки суммы, состава заказа, ресторана, успешной оплаты и объекта отзыва реализованы отложенными триггерами в `db/schema/03_business_constraints.sql`. Схема и эти проверки проверены на PostgreSQL 15 под `inspector` скриптом `db/check_business_constraints.sql`; восстановление бэкапа не проверялось.
+Связь отзыва с клиентом реализована через `review.order_id → order.client_id`; автор доступен в `review_details`, отдельный `review.client_id` исключён при нормализации. Межтабличные проверки суммы, состава заказа, ресторана, успешной оплаты и объекта отзыва реализованы отложенными триггерами в `db/schema/03_business_constraints.sql`. Схема и эти проверки проверены на PostgreSQL 15 под `inspector` скриптом `db/check_business_constraints.sql`; восстановление бэкапа проверено в рамках FOOD-110.
 
 ---
 
@@ -198,8 +198,8 @@
 - [x] Ему выдано `ALL PRIVILEGES` на схему `<фамилия>_food`.
 - [x] Ему выдано `USAGE` на `information_schema` и `pg_catalog` (по умолчанию есть у всех, явно проверь, что не отозвано).
 - [x] Ему выдано `USAGE` на `exts` (для `uuid_generate_v4`).
-- [] Под `inspector` работают: `insert_test_data(10)`, `erase_test_data()`, `add_product(...)`, `get_statistic()`, `courier_salary()`, `SELECT * FROM how_much_money`.
-- [] Под `inspector` работают запросы к `information_schema.tables` и `pg_catalog.pg_tables`.
+- [x] Под `inspector` работают: `insert_test_data(10)`, `erase_test_data()`, `add_product(...)`, `get_statistic()`, `courier_salary()`, `SELECT * FROM how_much_money`.
+- [x] Под `inspector` работают запросы к `information_schema.tables` и `pg_catalog.pg_tables`.
 
 **Проверка:** `psql -U inspector` → все вызовы выше выполняются без `permission denied`.
 
@@ -209,11 +209,11 @@
 
 **AC:**
 
-- [] Файл `foodexpress_<фамилия>.backup` в формате `pg_dump -Fc`.
-- [] Содержит только схему `<фамилия>_food`.
-- [] Восстанавливается на пустую БД без ошибок.
-- [] После восстановления + запуска `db/schema/grants.sql` пользователь `inspector` создан и имеет права из FOOD-109.
-- [] После восстановления `insert_test_data(10)` и `get_statistic()` работают под `inspector`.
+- [x] Файл `foodexpress_<фамилия>.backup` в формате `pg_dump -Fc`.
+- [x] Содержит только схему `<фамилия>_food`.
+- [x] Восстанавливается на пустую БД без ошибок.
+- [x] После восстановления + запуска `db/schema/grants.sql` пользователь `inspector` создан и имеет права из FOOD-109.
+- [x] После восстановления `insert_test_data(10)` и `get_statistic()` работают под `inspector`.
 
 **Проверка:** ты разворачиваешь `.backup` на своей машине, применяешь `grants.sql`, вызываешь функции под `inspector` — всё работает.
 
