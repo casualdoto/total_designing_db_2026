@@ -1,39 +1,28 @@
-DO $$
-BEGIN
-    -- Существующая роль может использоваться другими базами: её пароль сохраняем.
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'inspector') THEN
-        EXECUTE 'CREATE ROLE inspector LOGIN PASSWORD ''NetoSQL2025''';
-    END IF;
-END;
+do $$
+begin
+    if not exists (select 1 from pg_roles where rolname = 'inspector') then
+        create role inspector with login password 'NetoSQL2025';
+    else
+        alter role inspector with login password 'NetoSQL2025';
+    end if;
+
+    execute 'alter role inspector set search_path = khrestianovskii_food, exts';
+end
 $$;
 
-GRANT ALL PRIVILEGES ON SCHEMA khrestianovskii_food TO inspector;
-GRANT USAGE ON SCHEMA exts TO inspector;
-GRANT USAGE ON TYPE khrestianovskii_food.restaurant_status TO inspector;
-GRANT USAGE ON TYPE khrestianovskii_food.product_status TO inspector;
-GRANT USAGE ON TYPE khrestianovskii_food.courier_status TO inspector;
-GRANT USAGE ON TYPE khrestianovskii_food.order_status TO inspector;
-GRANT USAGE ON TYPE khrestianovskii_food.order_pay_status TO inspector;
-GRANT USAGE ON TYPE khrestianovskii_food.payment_status TO inspector;
-GRANT USAGE ON TYPE khrestianovskii_food.payment_type TO inspector;
-GRANT USAGE ON TYPE khrestianovskii_food.review_entity_type TO inspector;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA khrestianovskii_food TO inspector;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA khrestianovskii_food TO inspector;
-GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA khrestianovskii_food TO inspector;
-GRANT EXECUTE ON FUNCTION exts.uuid_generate_v4() TO inspector;
+grant all privileges on schema khrestianovskii_food to inspector;
+grant usage on schema exts to inspector;
+grant usage on schema information_schema to inspector;
+grant usage on schema pg_catalog to inspector;
+grant all privileges on all tables in schema khrestianovskii_food to inspector;
+grant all privileges on all sequences in schema khrestianovskii_food to inspector;
+grant execute on all routines in schema khrestianovskii_food to inspector;
 
-ALTER DEFAULT PRIVILEGES IN SCHEMA khrestianovskii_food
-    GRANT ALL PRIVILEGES ON TABLES TO inspector;
-ALTER DEFAULT PRIVILEGES IN SCHEMA khrestianovskii_food
-    GRANT USAGE ON TYPES TO inspector;
-ALTER DEFAULT PRIVILEGES IN SCHEMA khrestianovskii_food
-    GRANT EXECUTE ON FUNCTIONS TO inspector;
+alter default privileges in schema khrestianovskii_food
+    grant all privileges on tables to inspector;
 
-DO $$
-BEGIN
-    IF NOT has_schema_privilege('inspector', 'information_schema', 'USAGE')
-       OR NOT has_schema_privilege('inspector', 'pg_catalog', 'USAGE') THEN
-        RAISE EXCEPTION 'inspector должен иметь USAGE на системные схемы';
-    END IF;
-END;
-$$;
+alter default privileges in schema khrestianovskii_food
+    grant all privileges on sequences to inspector;
+
+alter default privileges in schema khrestianovskii_food
+    grant execute on routines to inspector;
