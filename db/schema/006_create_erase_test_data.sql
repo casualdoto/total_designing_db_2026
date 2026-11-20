@@ -4,7 +4,6 @@ begin
     delete from payment;
     delete from order_structure;
     delete from courier_pay;
-    delete from courier_name;
     delete from "order";
     delete from client_address;
     delete from product;

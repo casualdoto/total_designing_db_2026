@@ -92,12 +92,10 @@ begin
                then s.hire_date + 10
                     + floor(s.u * (v_today - s.hire_date - 10))::int
            end as dismissal_date,
-           concat_ws(' ', s.last_name, s.first_name, s.middle_name) as fio,
            s.last_name,
            s.first_name,
            s.middle_name,
-           '+79' || lpad((900000000 + s.idx)::text, 9, '0') as phone_number,
-           v_coef_min as coef
+           '+79' || lpad((900000000 + s.idx)::text, 9, '0') as phone_number
     from (
         select i as idx,
                exts.uuid_generate_v4() as courier_id,
@@ -157,7 +155,9 @@ begin
 
     insert into courier (
         courier_id,
-        fio,
+        last_name,
+        first_name,
+        middle_name,
         phone_number,
         status,
         hire_date,
@@ -165,7 +165,9 @@ begin
         coefficient
     )
     select courier_id,
-           fio,
+           last_name,
+           first_name,
+           middle_name,
            phone_number,
            status,
            hire_date,
@@ -173,21 +175,8 @@ begin
            v_coef_min
     from jsonb_to_recordset(v_courier_rows) as c(
         idx int, courier_id uuid, status courier_status, hire_date date,
-        dismissal_date date, fio varchar, last_name varchar, first_name varchar,
-        middle_name varchar, phone_number varchar, coef numeric
-    );
-
-    insert into courier_name (
-        courier_id,
-        last_name,
-        first_name,
-        middle_name
-    )
-    select courier_id, last_name, first_name, middle_name
-    from jsonb_to_recordset(v_courier_rows) as c(
-        idx int, courier_id uuid, status courier_status, hire_date date,
-        dismissal_date date, fio varchar, last_name varchar, first_name varchar,
-        middle_name varchar, phone_number varchar, coef numeric
+        dismissal_date date, last_name varchar, first_name varchar,
+        middle_name varchar, phone_number varchar
     );
 
     select array_agg(courier_id order by idx),
@@ -196,8 +185,7 @@ begin
       into v_cour_ids, v_cour_hire, v_cour_dism
       from jsonb_to_recordset(v_courier_rows) as c(
           idx int, courier_id uuid, status courier_status, hire_date date,
-          dismissal_date date, fio varchar, last_name varchar, first_name varchar,
-          middle_name varchar, phone_number varchar, coef numeric
+          dismissal_date date
       )
       where status != 'уволен';
 
@@ -603,7 +591,7 @@ begin
             )
             join (
                 select order_id,
-                       sum(price * quantity)::numeric(12,2) as order_amount
+                       round(sum(price * quantity), 2) as order_amount
                 from jsonb_to_recordset(v_line_rows) as line(
                     idx int, order_id uuid, pos int, product_id uuid,
                     quantity int, price numeric
@@ -895,10 +883,7 @@ begin
         where exists (
             select 1
             from jsonb_to_recordset(v_courier_rows) as generated(
-                idx int, courier_id uuid, status courier_status,
-                hire_date date, dismissal_date date, fio varchar,
-                last_name varchar, first_name varchar, middle_name varchar,
-                phone_number varchar, coef numeric
+                courier_id uuid
             )
             where generated.courier_id = c.courier_id
         );
@@ -915,10 +900,7 @@ begin
                      generated.dismissal_date,
                      orders.cnt
               from jsonb_to_recordset(v_courier_rows) as generated(
-                  idx int, courier_id uuid, status courier_status,
-                  hire_date date, dismissal_date date, fio varchar,
-                  last_name varchar, first_name varchar, middle_name varchar,
-                  phone_number varchar, coef numeric
+                  courier_id uuid, dismissal_date date
               )
               left join (
                   select courier_id, count(*) as cnt

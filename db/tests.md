@@ -76,7 +76,7 @@ ORDER BY table_name;
 ```
 
 Ожидается: `address`, `client`, `client_address`, `courier`, `courier_pay`, `order`, `order_structure`, `payment`, `product`, `product_category`, `restaurant`, `review` (12 + N штук).
-Факт: `address`, `client`, `client_address`, `courier`, `courier_name`, `courier_pay`, `how_much_money`, `order`, `order_structure`, `payment`, `product`, `product_category`, `restaurant`, `restaurant_legal_details`, `review` (14 + 1 представление).
+Факт: `address`, `client`, `client_address`, `courier`, `courier_pay`, `how_much_money`, `order`, `order_structure`, `payment`, `product`, `product_category`, `restaurant`, `restaurant_legal_details`, `review` (13 + 1 представление).
 Вердикт: `OK`.
 
 ### B.4. Все PK — `uuid`
@@ -120,7 +120,7 @@ ORDER BY tbl, conname;
 ```
 
 Ожидается: не менее 15 FK, все из erd.md.
-Факт: 18 FK
+Факт: 17 FK
 Вердикт: `OK`.
 
 ### B.7. Пароль — MD5
@@ -273,7 +273,7 @@ SELECT count(*) FROM courier WHERE status != 'уволен';
 ```
 
 Ожидается: `>= 1`.
-Факт: 10.
+Факт: 7.
 Вердикт: `OK`.
 
 ### C.8. `courier_pay` консистентен с правилами (BR-10.2)
@@ -762,7 +762,7 @@ RESET ROLE;
 ```
 
 Ожидается: 12 + N (количество таблиц).
-Факт: 15 (14 + 1 view).
+Факт: 14 (13 таблиц и 1 представление).
 Вердикт: `OK`.
 
 ### G.4. `pg_catalog` читается под `inspector`
@@ -775,7 +775,7 @@ RESET ROLE;
 ```
 
 Ожидается: 12 + N.
-Факт: 14
+Факт: 13 таблиц.
 Вердикт: `OK`.
 
 ### G.5. Все процедуры/функции работают под `inspector`
@@ -812,7 +812,7 @@ FROM courier c;
 ```
 
 Ожидается: два SubPlan, каждый — скан `"order"`. Время растёт линейно от числа курьеров.
-Факт: 0,400 мс, два `SubPlan` по 10 сканов `"order"`.
+Факт: 0,315 мс, два `SubPlan` по 10 сканов `"order"`.
 Вердикт: `OK`.
 
 ### H.2. `EXPLAIN ANALYZE` — паттерн «один JOIN»
@@ -828,7 +828,7 @@ GROUP BY c.courier_id;
 ```
 
 Ожидается: один `Hash Right Join` / `Hash Left Join`, один скан `"order"`. Время меньше, чем в H.1.
-Факт: 0,134 мс, один `Hash Left Join`, один скан `"order"`.
+Факт: 0,136 мс, один `Hash Left Join`, один скан `"order"`.
 Вердикт: `OK`.
 
 ### H.3. Применить к `get_statistic`
